@@ -44,3 +44,10 @@ Uncomplicated Firewall (UFW) project highlighting:
 - Port and IP-based traffic management
 - Advanced firewall rule implementation
 - Security policy enforcement techniques
+
+6. Web Application Security Testing with OWASP ZAP
+A web security assessment project using OWASP ZAP to identify and mitigate vulnerabilities in a Flask-based web application. This project demonstrates:
+- Configuring OWASP ZAP as a proxy for automated security testing
+- Performing active and passive scans to detect vulnerabilities
+- Identifying SQL injection risks in user input handling
+- Implementing secure coding practices to prevent exploitation
