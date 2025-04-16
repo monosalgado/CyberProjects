@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dont Bite Status</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="container">
+    <h1>☣️ DONT BITE</h1>
+    <p class="subtitle">Post-Apocalyptic Phishing Defense</p>
+
+    <div id="status">
+      <p><strong>Gemini API:</strong> <span id="api-status">Checking...</span></p>
+      <p><strong>Emails Analyzed:</strong> <span id="emails-analyzed">0</span></p>
+      <p><strong>Threats Detected:</strong> <span id="threats-detected">0</span></p>
+    </div>
+    
+    <!-- Toggle button -->
+    <button id="toggle-policy" style="margin-top: 20px; font-size: 0.9rem; background: none; border: none; color: #00ccff; text-decoration: underline; cursor: pointer;">
+      ⚙️ Show Policy Settings
+    </button>
+
+    <!-- Policy section, initially hidden -->
+    <div id="policy-section" style="display: none; margin-top: 10px;">
+      <h2 style="margin-top: 10px;">Policy Settings</h2>
+      <label for="policy-select">On phishing detection:</label>
+      <select id="policy-select">
+        <option value="default">🛑 Default – Just show report</option>
+        <option value="report">📤 Report to Admin (coming soon)</option>
+        <option value="delete">🗑️ Delete email (coming soon)</option>
+        <option value="spam">🚨 Send to Spam (coming soon)</option>
+      </select>
+    </div>
+
+    
+    <div id="alert-box" class="hidden">
+      <p>🚨 <strong>Warning!</strong> Suspicious email detected.</p>
+      <p class="bite-text">DONT BITE.</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+    "manifest_version": 3,
+    "name": "Dont Bite - Phishing Detector",
+    "description": "Post-apocalyptic Gmail guardian that detects phishing using Gemini API.",
+    "version": "1.0",
+    "permissions": [
+      "scripting",
+      "storage",
+      "activeTab"
+    ],
+    "host_permissions": [
+      "https://mail.google.com/*",
+      "https://generativelanguage.googleapis.com/*"
+    ],
+    "action": {
+      "default_popup": "popup/popup.html",
+      "default_icon": "icons/icon48.png" 
+    },
+    "background": {
+        "service_worker": "scripts/background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+      {
+        "matches": ["https://mail.google.com/*"],
+        "js": ["scripts/content.js"],
+        "run_at": "document_idle"
+      }
+    ],
+    "icons": {
+    "16": "icons/icon48.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon48.png"
+    }
+
+
+    
+  }
+  
