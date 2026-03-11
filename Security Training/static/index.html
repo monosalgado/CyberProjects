@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberGuard Academy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- HEADER -->
+        <header>
+            <div class="logo-container">
+                <span class="logo-icon">🛡️</span>
+                <h1>CyberGuard <span class="accent">Academy</span></h1>
+            </div>
+            <div id="user-info" class="hidden">
+                <span id="display-name">Guest</span>
+                <div class="score-pill">Score: <span id="current-score">0</span></div>
+            </div>
+        </header>
+
+        <!-- VIEW CONTAINER (SPA routing injects here) -->
+        <main id="view-container">
+            
+            <!-- VIEW: INTRO -->
+            <section id="view-intro" class="view active">
+                <div class="hero">
+                    <h2>Welcome to Interactive Security Training!</h2>
+                    <p>In the digital age, humans are the strongest line of defense. This module tests your ability to spot real-world phishing and credential harvesting attacks.</p>
+                    
+                    <div class="form-group slide-up">
+                        <label for="username">Enter your name to begin:</label>
+                        <input type="text" id="username" placeholder="E.g., David S." autocomplete="off">
+                        <button id="btn-start" class="btn btn-primary">Start Training</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: PHISHING MODULE -->
+            <section id="view-phishing" class="view hidden">
+                <div class="module-header">
+                    <h2>Module 1: The Inbox</h2>
+                    <p>Inspect the email below. Hover over links and check the sender address. Is this safe?</p>
+                </div>
+                
+                <div class="mail-client">
+                    <div class="mail-header">
+                        <div class="mail-from">
+                            <strong>From:</strong> IT Service Desk &lt;<span class="suspicious-element" data-tip="Look closely! 'servicedesk-itt.com' is not your company domain.">admin@servicedesk-itt.com</span>&gt;
+                        </div>
+                        <div class="mail-to"><strong>To:</strong> All Employees</div>
+                        <div class="mail-subject"><strong>Subject:</strong> URGENT: Password Expiry Notification</div>
+                    </div>
+                    <div class="mail-body">
+                        <p>Dear User,</p>
+                        <p>Your corporate password is set to expire in exactly 2 hours. If you do not update it immediately, you will lose access to all corporate systems including Email and VPN.</p>
+                        <p>Please click the secure link below to update your credentials immediately:</p>
+                        <br>
+                        <a href="#" class="btn-link suspicious-element" data-tip="Redirects to: http://192.168.x.x/login.php. This is an IP address, not a legitimate HR portal!">Update Password Now</a>
+                        <br><br>
+                        <p>Thank you,<br>IT Support</p>
+                    </div>
+                </div>
+
+                <div class="action-bar">
+                    <button class="btn btn-danger" onclick="submitAnswer('phishing', 'email_1', 'report', true)">Report Phishing</button>
+                    <button class="btn btn-success" onclick="submitAnswer('phishing', 'email_1', 'safe', false)">Mark as Safe</button>
+                </div>
+            </section>
+
+            <!-- VIEW: BROWSER MODULE -->
+            <section id="view-browser" class="view hidden">
+                <div class="module-header">
+                    <h2>Module 2: Safe Browsing</h2>
+                    <p>You clicked a link to log into your cloud storage. Look at the browser window below. Should you enter your credentials?</p>
+                </div>
+
+                <div class="browser-mockup">
+                    <div class="browser-toolbar">
+                        <div class="dots">
+                            <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                        </div>
+                        <div class="address-bar suspicious-element" data-tip="Missing HTTPS padlock and slight misspelling: 'googledrive-login.com'">
+                            <span class="icon-warning">⚠️ Not Secure</span> googledrive-login.com/auth
+                        </div>
+                    </div>
+                    <div class="browser-content">
+                        <div class="login-box">
+                            <img src="https://via.placeholder.com/150x50?text=Cloud+Drive" alt="Logo" class="mock-logo">
+                            <h3>Sign In</h3>
+                            <input type="email" placeholder="Email Address" disabled>
+                            <input type="password" placeholder="Password" disabled>
+                            <button class="btn btn-primary" disabled>Next</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-bar">
+                    <button class="btn btn-danger" onclick="submitAnswer('browsing', 'login_1', 'close', true)">Close Tab (Unsafe)</button>
+                    <button class="btn btn-success" onclick="submitAnswer('browsing', 'login_1', 'login', false)">Enter Credentials</button>
+                </div>
+            </section>
+
+            <!-- VIEW: RESULTS -->
+            <section id="view-results" class="view hidden">
+                <div class="results-container">
+                    <h2>Training Complete! 🏆</h2>
+                    <div class="score-card">
+                        <div class="score-circle">
+                            <span id="final-score">0</span>%
+                        </div>
+                        <p id="feedback-message" class="feedback-msg"></p>
+                    </div>
+
+                    <div class="breakdown">
+                        <h3>Scenario Breakdown</h3>
+                        <ul id="results-list">
+                            <!-- JS populates this -->
+                        </ul>
+                    </div>
+                    <button class="btn btn-primary" onclick="location.reload()">Take Training Again</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
