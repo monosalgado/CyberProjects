@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+google-genai
+chromadb
+pydantic
+requests
+beautifulsoup4
+pyyaml
+googlesearch-python
