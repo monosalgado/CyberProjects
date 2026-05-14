@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from backend.agent import SigmaAgent
+from backend.tunnel import tunnel_manager
 import uvicorn
 import os
 import uuid
@@ -11,6 +12,7 @@ import json
 
 # New Imports for Rules & Translation
 import backend.saved_rules as saved_rules
+from backend.translation import LLMTranslator
 from sigma.collection import SigmaCollection
 from sigma.backends.insight_idr import InsightIDRBackend
 
@@ -20,6 +22,18 @@ app = FastAPI(title="Sigma Assistant API")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Open SSH tunnel to Spark on app start (only if ECONOMY_PROVIDER=ollama)."""
+    tunnel_manager.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close SSH tunnel cleanly when app stops."""
+    tunnel_manager.stop()
 
 # In-Memory Session Store
 sessions: Dict[str, List[Dict]] = {}
@@ -51,6 +65,15 @@ try:
 except Exception as e:
     print(f"Failed to initialize Agent: {e}")
     agent = None
+
+# Initialize LLM Translator
+try:
+    translator = LLMTranslator(agent.client, agent.model_name) if agent else None
+    if translator:
+        print("LLM Translator Initialized")
+except Exception as e:
+    print(f"Failed to initialize Translator: {e}")
+    translator = None
 
 class AttackRequest(BaseModel):
     description: str
@@ -147,12 +170,13 @@ def analyze_attack(request: AttackRequest):
         
         # Save AI Response
         sessions[session_id].append({
-            "role": "assistant", 
+            "role": "assistant",
             "content": response_data["rule"],
-            "context": response_data["context"]
+            "context": response_data["context"],
+            "pipeline_metadata": response_data.get("pipeline_metadata"),
         })
         save_sessions()
-        
+
         # wrapper to include current session_id if it was new
         response_data["session_id"] = session_id
         
@@ -196,12 +220,13 @@ async def analyze_multimodal(
         
         # Save AI Response
         sessions[session_id].append({
-            "role": "assistant", 
+            "role": "assistant",
             "content": response_data["rule"],
-            "context": response_data["context"]
+            "context": response_data["context"],
+            "pipeline_metadata": response_data.get("pipeline_metadata"),
         })
         save_sessions()
-        
+
         response_data["session_id"] = session_id
         return response_data
     except Exception as e:
@@ -236,11 +261,12 @@ def analyze_stream(request: AttackRequest):
 
             if event_type == "result":
                 final_data = data
-                # Save AI response to session
+                # Save AI response to session (including pipeline_metadata for context panel persistence)
                 sessions[session_id].append({
                     "role": "assistant",
                     "content": data.get("rule", ""),
                     "context": data.get("context", {}),
+                    "pipeline_metadata": data.get("pipeline_metadata"),
                 })
                 save_sessions()
                 data["session_id"] = session_id
@@ -298,23 +324,16 @@ def delete_rule(rule_id: str):
 
 @app.post("/translate")
 def translate_rule(req: TranslateRequest):
+    if not translator:
+        raise HTTPException(status_code=500, detail="Translator not initialized")
     try:
-        # 1. Parse Sigma
-        collection = SigmaCollection.from_yaml(req.rule)
-        
-        # 2. Select Backend
-        if req.target.lower() == "leql":
-            backend = InsightIDRBackend()
-            queries = backend.convert(collection)
-            # InsightIDR might return list of strings
-            return {"query": queries[0] if queries else "No query generated"}
-        
-        else:
-            raise HTTPException(status_code=400, detail=f"Target {req.target} not supported yet.")
-            
+        result = translator.translate(req.rule, target=req.target)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print(f"Translation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Translation failed: {e}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

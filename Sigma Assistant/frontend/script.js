@@ -43,13 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'preprocessing', label: 'Preprocessing' },
         { id: 'web_enrichment', label: 'Web Enrichment' },
         { id: 'poc_analysis', label: 'PoC Analysis' },
-        { id: 'extraction', label: 'Entity Extraction' },
-        { id: 'ttp_mapping', label: 'TTP Mapping' },
-        { id: 'logsource', label: 'Log Source Analysis' },
+        { id: 'attack_vector', label: 'Attack Vector Extraction' },
+        { id: 'analysis', label: 'Threat Analysis' },
         { id: 'feedback', label: 'Review & Confirm' },
         { id: 'generation', label: 'Rule Generation' },
-        { id: 'validation', label: 'Validation' },
-        { id: 'optimization', label: 'Optimization' },
+        { id: 'review', label: 'Validation & Optimization' },
+        { id: 'coverage_check', label: 'Coverage Gap Check' },
     ];
 
     // --- Navigation Logic ---
@@ -177,13 +176,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (contextDiv) contextDiv.innerHTML = '<p class="empty-state">No specific context found.</p>';
 
         let lastContext = null;
+        let lastPipelineMeta = null;
         msgs.forEach(m => {
             appendMessage(m.role, m.content);
             if (m.role === 'assistant' && m.context && Object.keys(m.context).length > 0) {
                 lastContext = m.context;
+                lastPipelineMeta = m.pipeline_metadata || null;
             }
         });
-        if (lastContext) renderContext(lastContext);
+        if (lastContext) renderContext(lastContext, lastPipelineMeta);
         loadSessions();
     }
 
@@ -297,7 +298,22 @@ level: medium`;
 
             if (res.ok) {
                 const data = await res.json();
-                translationOutput.value = data.query;
+                let output = data.query || "No query generated";
+
+                if (data.log_set) {
+                    output += `\n\n/* Log Set: ${data.log_set} */`;
+                }
+                if (data.confidence) {
+                    output += `\n/* Confidence: ${data.confidence} */`;
+                }
+                if (data.explanation) {
+                    output += `\n\n/* ${data.explanation} */`;
+                }
+                if (data.warnings && data.warnings.length > 0) {
+                    output += `\n\n/* Warnings:\n${data.warnings.map(w => '   - ' + w).join('\n')}\n*/`;
+                }
+
+                translationOutput.value = output;
             } else {
                 const err = await res.json();
                 translationOutput.value = `Error: ${err.detail}`;
@@ -333,20 +349,71 @@ level: medium`;
         if (role === 'assistant' && (text.includes('```yaml') || text.includes('```'))) {
             content.innerHTML = marked.parse(text);
 
-            const actionsDiv = document.createElement('div');
-            actionsDiv.className = 'msg-actions';
-            const saveBtn = document.createElement('button');
-            saveBtn.innerText = '💾 Save to Library';
-            saveBtn.className = 'mini-btn';
-            saveBtn.onclick = () => saveRuleFromChat(text);
-            actionsDiv.appendChild(saveBtn);
+            // Extract all YAML blocks from the message
+            const yamlBlocks = extractAllYamlBlocks(text);
 
-            const downloadBtn = document.createElement('button');
-            downloadBtn.innerText = '⬇️ Download .yml';
-            downloadBtn.className = 'mini-btn';
-            downloadBtn.onclick = () => downloadRuleAsYml(text);
-            actionsDiv.appendChild(downloadBtn);
-            content.appendChild(actionsDiv);
+            if (yamlBlocks.length > 1) {
+                // Multiple rules: show per-rule save/download buttons
+                const rulesActionsDiv = document.createElement('div');
+                rulesActionsDiv.className = 'msg-actions rules-picker';
+
+                const label = document.createElement('span');
+                label.className = 'rules-picker-label';
+                label.innerText = `${yamlBlocks.length} rules generated:`;
+                rulesActionsDiv.appendChild(label);
+
+                yamlBlocks.forEach((yaml, idx) => {
+                    const titleMatch = yaml.match(/^title:\s*(.+)$/m);
+                    const ruleTitle = titleMatch ? titleMatch[1].trim() : `Rule ${idx + 1}`;
+
+                    const ruleRow = document.createElement('div');
+                    ruleRow.className = 'rule-pick-row';
+
+                    const ruleLabel = document.createElement('span');
+                    ruleLabel.className = 'rule-pick-name';
+                    ruleLabel.innerText = ruleTitle;
+                    ruleRow.appendChild(ruleLabel);
+
+                    const saveBtn = document.createElement('button');
+                    saveBtn.innerText = 'Save';
+                    saveBtn.className = 'mini-btn';
+                    saveBtn.onclick = () => saveOneRule(yaml);
+                    ruleRow.appendChild(saveBtn);
+
+                    const dlBtn = document.createElement('button');
+                    dlBtn.innerText = 'Download';
+                    dlBtn.className = 'mini-btn';
+                    dlBtn.onclick = () => triggerYmlDownload(yaml);
+                    ruleRow.appendChild(dlBtn);
+
+                    rulesActionsDiv.appendChild(ruleRow);
+                });
+
+                // Also add a "Save All" button
+                const saveAllBtn = document.createElement('button');
+                saveAllBtn.innerText = 'Save All to Library';
+                saveAllBtn.className = 'mini-btn save-all-btn';
+                saveAllBtn.onclick = () => saveAllRules(yamlBlocks);
+                rulesActionsDiv.appendChild(saveAllBtn);
+
+                content.appendChild(rulesActionsDiv);
+            } else {
+                // Single rule: simple save/download buttons
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'msg-actions';
+                const saveBtn = document.createElement('button');
+                saveBtn.innerText = 'Save to Library';
+                saveBtn.className = 'mini-btn';
+                saveBtn.onclick = () => saveRuleFromChat(text);
+                actionsDiv.appendChild(saveBtn);
+
+                const downloadBtn = document.createElement('button');
+                downloadBtn.innerText = 'Download .yml';
+                downloadBtn.className = 'mini-btn';
+                downloadBtn.onclick = () => downloadRuleAsYml(text);
+                actionsDiv.appendChild(downloadBtn);
+                content.appendChild(actionsDiv);
+            }
 
         } else {
             content.innerHTML = marked.parse(text || "");
@@ -362,6 +429,16 @@ level: medium`;
 
         chatHistory.appendChild(msgDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function extractAllYamlBlocks(text) {
+        const regex = /```yaml\n([\s\S]*?)\n```/g;
+        const blocks = [];
+        let m;
+        while ((m = regex.exec(text)) !== null) {
+            blocks.push(m[1]);
+        }
+        return blocks;
     }
 
     function downloadRuleAsYml(text) {
@@ -397,21 +474,48 @@ level: medium`;
     async function saveRuleFromChat(text) {
         const match = text.match(/```yaml\n([\s\S]*?)\n```/);
         if (match && match[1]) {
-            const ruleContent = match[1];
-            const res = await fetch('/rules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: ruleContent })
-            });
-            const rule = await res.json();
-            alert("Rule saved to library!");
-            if (confirm("Rule saved! Switch to library to view it?")) {
-                switchView('library');
-                await loadRules();
-                loadRuleIntoEditor(rule);
-            }
+            await saveOneRule(match[1]);
         } else {
             alert("No valid YAML rule found in this message.");
+        }
+    }
+
+    async function saveOneRule(yamlContent) {
+        const res = await fetch('/rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: yamlContent })
+        });
+        const rule = await res.json();
+        const titleMatch = yamlContent.match(/^title:\s*(.+)$/m);
+        const name = titleMatch ? titleMatch[1].trim() : 'Rule';
+        if (confirm(`"${name}" saved! Switch to library to view it?`)) {
+            switchView('library');
+            await loadRules();
+            loadRuleIntoEditor(rule);
+        }
+    }
+
+    async function saveAllRules(yamlBlocks) {
+        let savedCount = 0;
+        let lastRule = null;
+        for (const yaml of yamlBlocks) {
+            try {
+                const res = await fetch('/rules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: yaml })
+                });
+                lastRule = await res.json();
+                savedCount++;
+            } catch (e) {
+                console.error('Failed to save rule:', e);
+            }
+        }
+        if (confirm(`${savedCount} rule(s) saved to library! Switch to library?`)) {
+            switchView('library');
+            await loadRules();
+            if (lastRule) loadRuleIntoEditor(lastRule);
         }
     }
 
